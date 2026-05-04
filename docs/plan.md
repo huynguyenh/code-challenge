@@ -40,7 +40,8 @@ The brief mandates TypeScript and is otherwise open-ended ("free-pick a resource
 - [ ] **AC-P4-1**: `src/problem4/sumToN.ts` exports three functions named `sum_to_n_a`, `sum_to_n_b`, `sum_to_n_c`, each with signature `(n: number) => number` (matching the brief verbatim).
 - [ ] **AC-P4-2**: All three return identical correct sums for `n ∈ {0, 1, 5, 10, 100, 10_000}`.
 - [ ] **AC-P4-3**: All three return `0` for `n ≤ 0` (documented choice for negative/zero input).
-- [ ] **AC-P4-4**: The three implementations use **genuinely different algorithms**: (a) iterative loop, (b) tail-recursive helper, (c) closed-form Gauss formula `n*(n+1)/2`. No two are syntactic variants of the same approach.
+- [x] **AC-P4-4**: The three implementations use **genuinely different algorithms**: (a) iterative loop, (b) functional `Array.from(...).reduce(...)`, (c) closed-form Gauss formula `n*(n+1)/2`. No two are syntactic variants of the same approach.
+  - **Plan deviation**: originally planned a tail-recursive helper for (b). Swapped to functional reduce mid-implementation after the predicted V8 stack overflow at n=10_000 surfaced — the JSDoc had warned about it but I let the test ship anyway. Kept the spirit of "three different paradigms" while ensuring all three work for the full input range.
 - [ ] **AC-P4-5**: Each function has a **JSDoc comment** documenting time and space complexity.
 - [ ] **AC-P4-6**: `src/problem4/sumToN.test.ts` runs under Vitest and covers: happy path (matrix of n × 3 impls), boundary `0`, boundary `1`, negative `-5`, large `n=10_000`. All three impls produce the same answer for every valid n.
 - [ ] **AC-P4-7**: `src/problem4/README.md` summarises each approach, gives a Big-O table, calls out the trade-offs (e.g. recursion stack depth for large n), and embeds the test-run output.

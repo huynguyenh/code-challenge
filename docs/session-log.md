@@ -75,3 +75,27 @@ The user's inline note used `main.go` as the example file name. Claude flagged t
 - **No Claude/AI attribution** anywhere — commits, PR descriptions, code comments, README. Per `~/.claude/rules/global-claude.md`.
 
 ---
+
+## Plan, scaffolding, and Problem 4
+
+> **User:** lets go
+
+**Claude:** Acknowledged. Walked through the principal-engineer plan workflow: read `references/plan-workflow.md`, did the Phase-1 challenge (flagged that "basic filters" needed pinning down + that JWT was user-chosen, not brief-chosen), did the Phase-2 interview via four `AskUserQuestion`s (resource = Tasks; auth = login-only against seeded user; soft delete; Prisma + prisma-migrate). Skipped the Phase-3 deep-investigation agents on purpose — fresh repo, no existing state to gather context on.
+
+Wrote the plan to `~/.claude/plans/INTERVIEW-S5-BE/2026-05-04-99tech-backend-challenge.md`, mirrored to `docs/plan.md`. 7 ACs for Problem 4, 17 for Problem 5, 7 use cases, full risk register, full test plan.
+
+Then scaffolded the repo: root `package.json` + `tsconfig.json` (strict) + `vitest.config.ts` + `.yarnrc.yml` (`nodeLinker: node-modules`) + `.env.example` + `.gitignore`. `yarn install` clean (~3s, 20 packages, 61 MiB). `yarn test` correctly reports "no test files yet". `yarn typecheck` clean. Committed as `chore: scaffold repo with TypeScript, Vitest, and submission docs` on `main`. Created the public GitHub repo with `gh repo create huynguyenh/code-challenge --public --source=. --push` — repo lives at https://github.com/huynguyenh/code-challenge.
+
+### Problem 4
+
+Branched `feat/problem4`. Wrote `sumToN.ts` with three impls: iterative loop, **tail-recursive helper**, closed-form Gauss formula. Wrote the matrix test (7 inputs × 3 impls + 6 cross-impl consistency = 27 cases). First test run failed exactly where the JSDoc said it would: V8 stack overflow at n=10_000 in the recursive variant.
+
+Two fixes were available — cap the recursive test at smaller n (admits the impl doesn't scale) or swap to a paradigm that handles the full input range. Picked the swap: **functional `Array.from(...).reduce(...)`** as the new variant (b). Kept the spirit of "three different paradigms" (imperative / functional / mathematical) while making all three work for the AC's full range.
+
+Updated `docs/plan.md` to record the deviation explicitly (AC-P4-4 now reads "iterative loop / functional reduce / closed-form formula" with a note about what got swapped and why). Wrote the Problem 4 README with: complexity table, paradigm-comparison rationale, deviation note, runnable commands, full 27-line test output, and AC checklist (all checked).
+
+Final test run: 27/27 passing in ~155ms. `tsc --noEmit` clean.
+
+Next: commit, push, open PR #1.
+
+---
