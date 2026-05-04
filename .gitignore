@@ -1,0 +1,38 @@
+# Node
+node_modules/
+dist/
+build/
+*.log
+.npm/
+
+# Yarn
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.pnp.*
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Test / coverage
+coverage/
+*.lcov
+.nyc_output/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Claude private workspace — never push these
+.claude/
+
+# Database files (sqlite local dev, etc.)
+*.sqlite
+*.sqlite-journal

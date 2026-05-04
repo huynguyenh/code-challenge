@@ -1,0 +1,24 @@
+{
+  "name": "code-challenge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "99Tech Code Challenge — backend track (problems 4, 5).",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "yarn@4.5.0",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:p4": "vitest run src/problem4",
+    "test:p5": "vitest run src/problem5",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "20.14.0",
+    "tsx": "4.19.2",
+    "typescript": "5.6.3",
+    "vitest": "2.1.5"
+  }
+}
