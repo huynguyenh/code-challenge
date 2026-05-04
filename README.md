@@ -4,7 +4,7 @@ This repo contains my answers to the **backend** track of the [99Tech Code Chall
 
 | # | Problem | Status | Folder |
 |---|---|---|---|
-| 4 | Three ways to sum to n | _pending_ | [`src/problem4`](./src/problem4) |
+| 4 | Three ways to sum to n | ✅ done | [`src/problem4`](./src/problem4) |
 | 5 | A Crude Server | _pending_ | [`src/problem5`](./src/problem5) |
 | 6 | Architecture | _deferred_ | [`src/problem6`](./src/problem6) |
 
