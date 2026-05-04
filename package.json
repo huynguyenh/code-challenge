@@ -13,11 +13,33 @@
     "test:watch": "vitest",
     "test:p4": "vitest run src/problem4",
     "test:p5": "vitest run src/problem5",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "p5:dev": "tsx watch src/problem5/src/server.ts",
+    "p5:start": "tsx src/problem5/src/server.ts",
+    "p5:db:generate": "prisma generate --schema src/problem5/prisma/schema.prisma",
+    "p5:db:migrate": "prisma migrate deploy --schema src/problem5/prisma/schema.prisma",
+    "p5:db:migrate:dev": "prisma migrate dev --schema src/problem5/prisma/schema.prisma",
+    "p5:db:seed": "tsx src/problem5/prisma/seed.ts",
+    "p5:db:reset": "prisma migrate reset --force --schema src/problem5/prisma/schema.prisma --skip-seed && yarn p5:db:seed"
+  },
+  "dependencies": {
+    "@prisma/client": "5.22.0",
+    "bcrypt": "5.1.1",
+    "dotenv": "16.4.5",
+    "express": "4.21.1",
+    "helmet": "8.0.0",
+    "jsonwebtoken": "9.0.2",
+    "zod": "3.23.8"
   },
   "devDependencies": {
+    "@types/bcrypt": "5.0.2",
+    "@types/express": "4.17.21",
+    "@types/jsonwebtoken": "9.0.7",
     "@types/node": "20.14.0",
-    "tsx": "4.19.2",
+    "@types/supertest": "6.0.2",
+    "prisma": "5.22.0",
+    "supertest": "7.0.0",
+    "tsx": "4.21.0",
     "typescript": "5.6.3",
     "vitest": "2.1.5"
   }

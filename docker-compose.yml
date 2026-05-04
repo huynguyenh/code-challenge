@@ -1,0 +1,23 @@
+# Postgres for Problem 5. Non-default port (55432) to avoid colliding
+# with any local Postgres a reviewer might already have running on 5432.
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: code_challenge_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: code_challenge
+    ports:
+      - "55432:5432"
+    volumes:
+      - code_challenge_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "code_challenge"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  code_challenge_pg_data:

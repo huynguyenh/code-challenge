@@ -99,3 +99,29 @@ Final test run: 27/27 passing in ~155ms. `tsc --noEmit` clean.
 Next: commit, push, open PR #1.
 
 ---
+
+## Problem 5 — Tasks CRUD
+
+> **User:** Merge PR #1 (squash) now, then branch `feat/problem5` from fresh main
+
+**Claude:** `gh pr merge 1 --squash --delete-branch` succeeded; main is now at the squashed P4 commit. Branched `feat/problem5`.
+
+Built end-to-end in step order from the plan:
+
+1. **Infra** — `docker-compose.yml` (Postgres 16, port 55432), root `package.json` updated with Express/Prisma/JWT/Zod/helmet/bcrypt deps + scripts (`p5:dev`, `p5:db:*`). Docker Desktop wasn't running locally; `open -a Docker` brought it up. `yarn install` clean.
+2. **Prisma schema** — `User` and `Task` models with snake_case `@map`, soft-delete column on Task, indexes on `(created_by, deleted_at)`, `status`, `due_date`, `assignee_id`. `yarn p5:db:migrate:dev --name init` generated the migration SQL and applied it.
+3. **Seed** — demo user + alice + bob, all sharing `demo1234` password, plus 5 sample tasks across statuses with two due-dated tasks for assignee filtering. Idempotent via `upsert` + a `deleteMany` reset for demo's tasks.
+4. **Express skeleton** — `lib/env.ts` (Zod boot-validation, refuses if JWT_SECRET < 32 chars), `lib/prisma.ts` (HMR-safe singleton), `lib/jwt.ts` (HS256, 24h, strict algorithm pin on verify), `lib/errors.ts` (`AppError` factory: invalidCredentials, notFound, unauthorized, validation).
+5. **Middleware** — `requireAuth` (Bearer parser → `req.user`), `errorHandler` (uniform `{ error: { code, message, details? } }` shape, never leaks stack in prod), `notFoundHandler`.
+6. **Auth module** — login schema (Zod), service that runs `bcrypt.compare` against a dummy hash even when the user is missing (kills the timing oracle on top of the message oracle), POST `/auth/login` route.
+7. **Tasks module** — Zod schemas (create / update / list-query with `page/pageSize` clamped 1..100), service with centralised `NOT_DELETED` predicate + serializer + atomic soft-delete `updateMany` (no TOCTOU), CRUD routes mounted under `/tasks` with `requireAuth`.
+8. **Smoke test on the running server** — first `yarn p5:start` failed with a tsx 4.19.2 incompatibility on Node 25 (`node_modules/get-intrinsic/index.js:154:24` — `SyntaxError: Unexpected string`). Upgraded `tsx` to 4.21.0 (pinned, no caret). Re-ran: `/healthz` returns `{ ok: true }`, `/auth/login` returns a JWT, `/tasks` lists the seeded data. Killed the process.
+9. **Integration tests** — `tests/auth.test.ts` (7 cases: login happy + wrong-pwd + unknown-email + bad-body + auth-gate × 3) and `tests/tasks.test.ts` (21 cases: POST happy/400/401, GET list with filters/pagination/invalid status/oversized pageSize, GET one happy/404/foreign-404, PATCH happy/400/foreign-404, DELETE happy/post-GET-404/post-PATCH-404/twice/foreign-404/list-excludes). Tests reset their own task rows in `beforeEach` and create a second user on the fly for cross-user isolation.
+
+Final result: **55/55 tests pass** (P4: 27, P5: 28) in ~950ms total. `yarn typecheck` clean.
+
+10. **README** — reviewer-first walkthrough: prerequisites → setup → API reference → curl walkthrough → tests → design notes → AC checklist (all 17 ticked).
+
+Next: commit, push, PR #2.
+
+---

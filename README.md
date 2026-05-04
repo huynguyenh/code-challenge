@@ -5,7 +5,7 @@ This repo contains my answers to the **backend** track of the [99Tech Code Chall
 | # | Problem | Status | Folder |
 |---|---|---|---|
 | 4 | Three ways to sum to n | ✅ done | [`src/problem4`](./src/problem4) |
-| 5 | A Crude Server | _pending_ | [`src/problem5`](./src/problem5) |
+| 5 | A Crude Server | ✅ done | [`src/problem5`](./src/problem5) |
 | 6 | Architecture | _deferred_ | [`src/problem6`](./src/problem6) |
 
 > Each problem is implemented on its own feature branch and merged via a squashed PR — see the [Pull Requests tab](../../pulls?q=is%3Apr) for the per-problem story.

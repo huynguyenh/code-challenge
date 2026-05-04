@@ -1,0 +1,57 @@
+// Prisma schema for Problem 5 — Tasks CRUD with soft delete + JWT auth.
+// All snake_case in the DB, camelCase in the JS layer (via @map).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TaskStatus {
+  todo
+  in_progress
+  done
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  name         String
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  createdTasks  Task[] @relation("TaskCreator")
+  assignedTasks Task[] @relation("TaskAssignee")
+
+  @@map("users")
+}
+
+model Task {
+  id          String     @id @default(uuid()) @db.Uuid
+  title       String
+  description String?
+  status      TaskStatus @default(todo)
+  dueDate     DateTime?  @map("due_date")
+  assigneeId  String?    @map("assignee_id") @db.Uuid
+  createdById String     @map("created_by") @db.Uuid
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  deletedAt   DateTime?  @map("deleted_at")
+
+  createdBy User  @relation("TaskCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  assignee  User? @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  // List queries always filter by (created_by, deleted_at=NULL).
+  @@index([createdById, deletedAt])
+  // Status filter is the most common filter in the brief's "basic filters".
+  @@index([status])
+  // Date-range filters use due_date.
+  @@index([dueDate])
+  // Cross-user assignee filter.
+  @@index([assigneeId])
+  @@map("tasks")
+}
