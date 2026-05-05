@@ -36,6 +36,7 @@ The load-bearing decisions are flagged 🎯.
 12. [Improvements](#12-improvements)
 13. [Open questions](#13-open-questions)
 14. [Glossary](#14-glossary)
+15. [Todo / tickets](#15-todo--tickets)
 
 ---
 
@@ -939,6 +940,75 @@ The implementing team should resolve these with product before starting.
 
 ---
 
+## 15. Todo / tickets
+
+The implementation backlog. Each ticket is independently scoped, has explicit acceptance criteria, and links back to the spec sections it implements. Phase ordering reflects dependencies, not priority — Phase 1 must complete before any Phase 2 ticket can start.
+
+Every ticket lives at [`todo/<id>.md`](./todo/) and follows the same structure: context → scope (in/out) → ACs → implementation notes → test plan → risks.
+
+### Phase 1 — Foundation
+
+| ID | Title | Effort | Deps | File |
+|---|---|---|---|---|
+| **T01** | Database schema and migrations | M | — | [`todo/T01-database-schema.md`](./todo/T01-database-schema.md) |
+| **T02** | Service scaffold — config, env validation, JWT util, error handling | M | T01 | [`todo/T02-service-scaffold.md`](./todo/T02-service-scaffold.md) |
+
+### Phase 2 — Core endpoints
+
+| ID | Title | Effort | Deps | File |
+|---|---|---|---|---|
+| **T03** | `POST /actions/start` endpoint | M | T01, T02 | [`todo/T03-actions-start.md`](./todo/T03-actions-start.md) |
+| **T04** | `POST /actions/complete` endpoint (security-critical) | L | T01, T02, T03 | [`todo/T04-actions-complete.md`](./todo/T04-actions-complete.md) |
+| **T05** | `GET /scoreboard` endpoint | S | T01, T02 | [`todo/T05-scoreboard-read.md`](./todo/T05-scoreboard-read.md) |
+
+### Phase 3 — Live updates
+
+| ID | Title | Effort | Deps | File |
+|---|---|---|---|---|
+| **T06** | SSE Hub — `GET /scoreboard/stream` | L | T04, T05 | [`todo/T06-sse-hub.md`](./todo/T06-sse-hub.md) |
+
+### Phase 4 — Hardening
+
+| ID | Title | Effort | Deps | File |
+|---|---|---|---|---|
+| **T07** | Rate limiting and basic abuse caps | S | T03, T04, T05, T06 | [`todo/T07-rate-limiting.md`](./todo/T07-rate-limiting.md) |
+| **T08** | Background jobs — sweeper, reconciliation, audit retention | M | T01 | [`todo/T08-background-jobs.md`](./todo/T08-background-jobs.md) |
+| **T09** | Observability — metrics, alerts, dashboards, audit log policy | M | T03, T04, T05, T06, T07, T08 | [`todo/T09-observability.md`](./todo/T09-observability.md) |
+
+### Effort estimate
+
+Sizes use a t-shirt scale (S ≈ ½ day; M ≈ 1–2 days; L ≈ 2–3 days) for **one senior engineer working without interruption**. Multiply by your team's typical productivity discount.
+
+| Phase | Tickets | Sum | Cumulative |
+|---|---|---|---|
+| 1 — Foundation | T01, T02 | 2–4 days | 2–4 days |
+| 2 — Core endpoints | T03, T04, T05 | 4½–7½ days | 6½–11½ days |
+| 3 — Live updates | T06 | 2–3 days | 8½–14½ days |
+| 4 — Hardening | T07, T08, T09 | 2½–4½ days | 11–19 days |
+
+**Total: ~11–19 engineer-days**, or ~6–10 calendar days with two engineers parallel-working when dependencies allow.
+
+### Critical path
+
+```
+T01 ──> T02 ──> T03 ──> T04 ──> T06 ──> T07 ──> T09
+                     ╲              ╱
+                      └──> T05 ────┘
+                                    
+T01 ──> T08 (parallel branch)
+```
+
+T05 can run in parallel with T04 once T01 + T02 are done. T08 can run in parallel with everything from T02 onwards. Everything else is strict-sequential by dependency.
+
+### What this backlog deliberately does NOT cover
+
+- **Defining the action vocabulary** — open question #1 in [§13](#13-open-questions); product input required before T03 can pin its `action_type` enum.
+- **Anomaly detection** — listed as [§12.2](#122-anomaly-detection-on-score-velocity); a separate ML-shaped initiative outside this backend module.
+- **Multi-leaderboard support, sharding, WebSocket upgrade** — all in [§12 Improvements](#12-improvements); next-quarter scope.
+- **The frontend integration** — the SSE / polling client SDK is out of scope; the spec gives the wire format the frontend should target.
+
+---
+
 ## Appendix A — Sequence-diagram index
 
 For convenience, every Mermaid sequence diagram in this document:
@@ -956,7 +1026,3 @@ This spec leans on patterns from:
 - [Server-Sent Events (WHATWG)](https://html.spec.whatwg.org/multipage/server-sent-events.html) — `Last-Event-ID`, reconnect, heartbeat.
 - [Redis sorted sets](https://redis.io/docs/data-types/sorted-sets/) — `ZADD`, `ZINCRBY`, `ZREVRANGE`.
 - [OWASP API Security Top 10 (2023)](https://owasp.org/API-Security/editions/2023/en/0x00-introduction/) — threat categories used in [§8](#8-security-model).
-
----
-
-*Spec v1.0 — 2026-05-05. Author: huynguyenh (interview submission for 99Tech Code Challenge).*
