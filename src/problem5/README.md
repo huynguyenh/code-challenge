@@ -116,7 +116,9 @@ All `/tasks/*` endpoints require `Authorization: Bearer <jwt>`. All errors share
 | 200 | `{ data: Task[], meta: { page, pageSize, total } }` |
 | 400 | invalid filter or out-of-range pageSize |
 
-`q` is case-insensitive substring search across `title` + `description`. Date filters accept anything `Date.parse` understands (ISO 8601 with or without time).
+`q` is case-insensitive substring search across `title` + `description`, capped at 200 chars. Date filters accept anything `Date.parse` understands (ISO 8601 with or without time).
+
+> **Performance note**: `q` translates to PostgreSQL `ILIKE '%term%'`. With a leading wildcard the planner can't use the b-tree indexes, so this is an O(n) scan of the user's task subset. Fine for the brief's scale; a production deployment would add a `pg_trgm` GIN index on `lower(title)` and `lower(description)`, or move to full-text search (`tsvector` + GIN).
 
 ### `POST /tasks`
 
@@ -162,12 +164,12 @@ The integration tests hit a real Postgres via the seeded demo user and a second 
 ### Test report
 
 ```
- ✓ src/problem5/tests/tasks.test.ts  (21 tests)  ~200ms
- ✓ src/problem5/tests/auth.test.ts   (7 tests)   ~170ms
+ ✓ src/problem5/tests/tasks.test.ts  (22 tests)  ~200ms
+ ✓ src/problem5/tests/auth.test.ts   (9 tests)   ~175ms
 
  Test Files  2 passed (2)
-      Tests  28 passed (28)
-   Duration  ~940ms
+      Tests  31 passed (31)
+   Duration  ~1.0s
 ```
 
 Highlights:
@@ -179,11 +181,11 @@ Highlights:
 
 ## Design notes worth flagging for the reviewer
 
-1. **403 → 404 collapse** on cross-user access. Every read goes through `loadOwned(id, userId)` which uses `findFirst({ where: { id, createdById, deletedAt: null }})`. Foreign and unknown look identical to the client — no ID-existence oracle.
+1. **403 → 404 collapse** on cross-user access. Every read uses `findFirst({ where: { id, createdById, deletedAt: null }})`. Foreign and unknown look identical to the client — no ID-existence oracle.
 
 2. **Soft delete is centralised**. There's exactly one place — `NOT_DELETED` in [`service.ts`](./src/modules/tasks/service.ts) — that defines "active task". Every CRUD method composes that predicate into its `where`. New endpoints that forget the filter would stand out immediately in review.
 
-3. **Atomic delete**. `deleteTask` issues a single `UPDATE WHERE id = ? AND created_by = ? AND deleted_at IS NULL` instead of a check-then-act sequence. Two concurrent deletes can't both succeed; the second sees `count = 0` and returns 404.
+3. **Atomic write paths**. Both `deleteTask` and `updateTask` issue a single `UPDATE … WHERE id = ? AND created_by = ? AND deleted_at IS NULL` via `updateMany`. No check-then-act sequence — a concurrent delete between two queries can't make a PATCH succeed against a soft-deleted row.
 
 4. **Auth response timing**. `login()` runs `bcrypt.compare` even when the user doesn't exist, against a dummy hash. Equal-time responses for "wrong password" vs "unknown email" — no timing oracle on top of the no-message oracle.
 

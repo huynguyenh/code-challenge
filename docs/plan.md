@@ -164,7 +164,7 @@ The brief mandates TypeScript and is otherwise open-ended ("free-pick a resource
 
 - `users` table: `id (uuid, pk)`, `email (citext, unique)`, `name`, `password_hash`, `created_at`
 - `tasks` table: `id (uuid, pk)`, `title`, `description (nullable)`, `status (enum)`, `due_date (nullable)`, `assignee_id (fk users.id, nullable)`, `created_by (fk users.id)`, `created_at`, `updated_at`, `deleted_at (nullable)`
-- Indexes: `tasks(created_by, deleted_at)`, `tasks(status)`, `tasks(due_date) WHERE deleted_at IS NULL`, `tasks(assignee_id) WHERE deleted_at IS NULL`
+- Indexes: `tasks(created_by, deleted_at)`, `tasks(status)`, `tasks(due_date)`, `tasks(assignee_id)`. **Plan deviation**: original plan called for partial indexes `WHERE deleted_at IS NULL` on the latter two. Prisma's schema DSL doesn't model partial indexes — would have required a hand-edited migration SQL. Shipped unconditional indexes; partial-index follow-up is out of scope for this submission.
 - Downtime risk: **none** (greenfield)
 - Backfill: **n/a**
 - Rollback: `prisma migrate reset` for dev; not deployed to prod

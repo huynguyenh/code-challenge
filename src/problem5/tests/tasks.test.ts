@@ -11,6 +11,7 @@ import bcrypt from 'bcrypt';
 import { createApp } from '../src/app.js';
 import { signToken } from '../src/lib/jwt.js';
 import { prisma } from '../src/lib/prisma.js';
+import { disconnect, ensureDemoUser } from './helpers/db.js';
 
 const app = createApp();
 
@@ -22,14 +23,7 @@ let otherToken = '';
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
 
 beforeAll(async () => {
-  const demo = await prisma.user.findUnique({
-    where: { email: 'demo@example.com' },
-  });
-  if (!demo) {
-    throw new Error(
-      'Demo user not found. Run `yarn p5:db:migrate && yarn p5:db:seed` first.',
-    );
-  }
+  const demo = await ensureDemoUser();
   demoId = demo.id;
   demoToken = signToken({ sub: demo.id, email: demo.email });
 
@@ -61,7 +55,7 @@ afterAll(async () => {
     where: { OR: [{ createdById: demoId }, { createdById: otherId }] },
   });
   await prisma.user.delete({ where: { id: otherId } }).catch(() => {});
-  await prisma.$disconnect();
+  await disconnect();
 });
 
 describe('POST /tasks', () => {
@@ -214,6 +208,17 @@ describe('GET /tasks/:id', () => {
       .get(`/tasks/${taskId}`)
       .set(auth(otherToken));
     expect(res.status).toBe(404);
+  });
+
+  it('returns 400 (not 500) for a malformed UUID in the path', async () => {
+    // Regression guard: Prisma rejects non-UUID input on @db.Uuid columns
+    // (P2023). Without route-layer Zod validation that error fell through
+    // to a 500. The taskIdParamSchema catches it as a 400 VALIDATION_ERROR.
+    const res = await request(app)
+      .get('/tasks/not-a-uuid')
+      .set(auth(demoToken));
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
   });
 });
 

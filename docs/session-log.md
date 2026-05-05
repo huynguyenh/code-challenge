@@ -125,3 +125,69 @@ Final result: **55/55 tests pass** (P4: 27, P5: 28) in ~950ms total. `yarn typec
 Next: commit, push, PR #2.
 
 ---
+
+## /hnh-review-pr self-review on PR #2
+
+> **User:** Run /hnh-review-pr + /security-review on PR #2 now, fix findings on the same branch, then merge
+
+**Claude:** Ran the principal-engineer review pipeline on the live PR before any merge.
+
+### Phase 0 — context
+No project-level `CLAUDE.md` (greenfield). Used `docs/plan.md` as the source of truth for "what's deliberate vs what's a bug".
+
+### Phase 1 — metadata
+`gh pr view 2 --json title,body,headRefName,…`, full diff to `/tmp/pr2.diff` (4149 lines, 28 files).
+
+### Phase 2 — five parallel review agents
+Skipped Agent A (Document Fetcher — no Jira/esa, Notion brief already in hand) and Agent D (Discussion History — fresh PR). Launched the substantive five in parallel:
+
+| Agent | Result |
+|---|---|
+| **B — Build verifier** | GREEN. install/typecheck/test/smoke all clean, zero warnings. |
+| **C — Architecture & correctness** | 1 CRITICAL, 3 WARNING, 6 SUGGESTION. The big ones: malformed UUID in path param crashes to 500; PATCH has a TOCTOU that DELETE got right; misleading bcrypt comment claiming "decoy" plaintext that doesn't actually verify. |
+| **E — Clean code** | 0 WARNING, 5 SUGGESTION. Strongest: rename `serialise` → `toApiTask`; extract `asyncHandler` to drop 6× try/catch; mirror `updateTask` to `deleteTask`'s atomicity; flatten the `listTasks` where-builder; destructure `result.count`. |
+| **F — DRY** | 3 SUGGESTION. The `asyncHandler` repetition is worth extracting; the test-file precondition probe is duplicated and should move to a helper. |
+| **G — Layer compliance** | None. Route → service → prisma layering is consistent; no DB calls leak into routes, no HTTP semantics leak into services. |
+
+### Phase 3 — verification
+Ran V1 (Fact Verifier) + V2 (Logic Verifier) in parallel — re-read source independently, reproduced behavior with curl where possible.
+
+| Finding | Original verdict | Verification |
+|---|---|---|
+| C1 — malformed UUID → 500 | CRITICAL | **CONFIRMED** by `curl /tasks/not-a-uuid` returning 500 with Prisma `P2023` in server log. |
+| W2 — `updateTask` TOCTOU | WARNING | **CONFIRMED** by tracing SQL: two separate Prisma calls, second one filters only by id. `deleteTask` got it right; `updateTask` didn't mirror the pattern. |
+| W3 — JWT trusts sub without DB lookup | WARNING | **PARTIALLY_CORRECT.** Technically true; practically unreachable — plan explicitly de-scoped register and there's no user-deletion endpoint. Downgraded to a documented design note. |
+| W4 — bcrypt comment claims hash matches "decoy" | WARNING | **CONFIRMED.** `bcrypt.compare('decoy', hash)` returns `false`. Security property is unaffected (constant-time still works); only the comment is wrong. Cosmetic NIT. |
+| S6 — partial indexes drift | SUGGESTION | **CONFIRMED.** Plan called for partial; Prisma DSL can't model partial; shipped unconditional. Updated plan to reflect reality. |
+| S8 — empty PATCH bumps `updated_at` | SUGGESTION | **INCORRECT.** V2 ran it live: when `data` ends up `{}`, Prisma short-circuits and `updated_at` stays put. Architecture agent was wrong; finding dropped. |
+| S9 — wrong-secret JWT not tested | SUGGESTION | **CONFIRMED.** AC-P5-AUTH-4 names "expired" + "different secret" — neither was tested. |
+| S10 — `q` has no max length | SUGGESTION | **CONFIRMED.** No `.max()` in the schema. |
+| Algorithm-confusion concern | (in checklist) | **VERIFIED SAFE.** `verifyToken` already passes `algorithms: ['HS256']`. No-op for the implementer. |
+
+### Phase 4 — applied fixes on the same branch
+
+| Fix | Files |
+|---|---|
+| **C1** UUID param validation via Zod (3 routes) | `src/problem5/src/modules/tasks/{schema,route}.ts` |
+| **W1** `updateTask` mirror to `deleteTask`'s atomic `updateMany` | `src/problem5/src/modules/tasks/service.ts` |
+| **S1** Cap `q` at 200 chars | `src/problem5/src/modules/tasks/schema.ts` |
+| **S2** Extract `asyncHandler` helper, drop 6× try/catch from auth + tasks routes | new `src/problem5/src/lib/asyncHandler.ts`; both `route.ts` files |
+| **S3** Document the no-DB-lookup tradeoff in the auth middleware | `src/problem5/src/middleware/auth.ts` |
+| **S4** Add wrong-secret JWT test + expired JWT test | `src/problem5/tests/auth.test.ts` |
+| **S5** Note the partial-index drift | `docs/plan.md` |
+| **S6** Note the `q` `ILIKE` performance characteristic | `src/problem5/README.md` |
+| **CC1** Rename `serialise` → `toApiTask` | `src/problem5/src/modules/tasks/service.ts` |
+| **CC2** `const { count } = await ...` instead of `result.count` | `src/problem5/src/modules/tasks/service.ts` |
+| **W4** Replace misleading "real bcrypt hash of decoy" comment | `src/problem5/src/modules/auth/service.ts` |
+| **D1** Extract `tests/helpers/db.ts` (`ensureDemoUser`, `disconnect`) | new file + both test files |
+
+Plus a new test that asserts `GET /tasks/not-a-uuid` returns 400, regression-guarding C1.
+
+### Final result after the review-driven fixes
+- **58/58 tests pass** (P4: 27, P5: 9 auth + 22 tasks). +3 cases vs pre-review.
+- `yarn typecheck` clean.
+- Two findings deliberately dropped: the empty-PATCH `updated_at` claim (V2 disproved it) and the JWT-no-DB-lookup item (no in-band exploit path given the plan's scope; documented instead of changed).
+
+Next: push the fix commit, run the security agent, then merge.
+
+---

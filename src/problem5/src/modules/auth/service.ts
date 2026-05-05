@@ -16,8 +16,10 @@ export async function login({
   const user = await prisma.user.findUnique({ where: { email } });
 
   // Always run bcrypt.compare even when the user is missing, so the
-  // response time doesn't leak which case we're in. The dummy hash below
-  // is a real bcrypt hash of the string "decoy" with cost 10.
+  // response time doesn't leak which case we're in. The dummy is an
+  // opaque, well-formed bcrypt hash whose plaintext is irrelevant — the
+  // point is to absorb the same CPU cost as a real comparison so the
+  // unknown-email path takes the same wall time as the wrong-password path.
   const dummyHash =
     '$2b$10$CwTycUXWue0Thq9StjUM0uJ8.GcXbvg1aF0u9b1J3hH4OX9o2KTZG';
   const ok = await bcrypt.compare(

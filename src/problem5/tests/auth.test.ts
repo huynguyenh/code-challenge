@@ -1,25 +1,17 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
+import jwt from 'jsonwebtoken';
 import { createApp } from '../src/app.js';
-import { prisma } from '../src/lib/prisma.js';
+import { disconnect, ensureDemoUser } from './helpers/db.js';
 
 const app = createApp();
 
 beforeAll(async () => {
-  // Demo user is the seed's responsibility — tests run against the same
-  // seeded DB the dev server uses.
-  const exists = await prisma.user.findUnique({
-    where: { email: 'demo@example.com' },
-  });
-  if (!exists) {
-    throw new Error(
-      'Demo user not found. Run `yarn p5:db:migrate && yarn p5:db:seed` first.',
-    );
-  }
+  await ensureDemoUser();
 });
 
 afterAll(async () => {
-  await prisma.$disconnect();
+  await disconnect();
 });
 
 describe('POST /auth/login', () => {
@@ -79,6 +71,34 @@ describe('Auth middleware (gate on /tasks)', () => {
     const res = await request(app)
       .get('/tasks')
       .set('Authorization', 'Bearer not-a-real-token');
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 401 for a JWT signed with a different secret', async () => {
+    // Same algorithm, same payload shape — only the secret differs.
+    // Exercises the JsonWebTokenError "invalid signature" branch.
+    const fakeToken = jwt.sign(
+      { sub: 'whoever', email: 'demo@example.com' },
+      'a-completely-unrelated-secret-of-sufficient-length-for-zod-32+',
+      { algorithm: 'HS256', expiresIn: '1h' },
+    );
+    const res = await request(app)
+      .get('/tasks')
+      .set('Authorization', `Bearer ${fakeToken}`);
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 401 for an expired JWT', async () => {
+    // Sign with the actual secret but with an `exp` in the past, so the
+    // signature is valid but the token is rejected on age.
+    const expiredToken = jwt.sign(
+      { sub: 'whoever', email: 'demo@example.com' },
+      process.env['JWT_SECRET']!,
+      { algorithm: 'HS256', expiresIn: '-1h' },
+    );
+    const res = await request(app)
+      .get('/tasks')
+      .set('Authorization', `Bearer ${expiredToken}`);
     expect(res.status).toBe(401);
   });
 });

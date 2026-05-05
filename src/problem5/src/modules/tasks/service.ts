@@ -14,7 +14,7 @@ const NOT_DELETED: Prisma.TaskWhereInput = { deletedAt: null };
 // Snake_case at the API boundary, camelCase inside the service. The DB
 // already uses snake_case so this keeps the wire shape feeling like a
 // regular REST API rather than a leaky Prisma export.
-const serialise = (task: Task) => ({
+const toApiTask = (task: Task) => ({
   id: task.id,
   title: task.title,
   description: task.description,
@@ -26,12 +26,12 @@ const serialise = (task: Task) => ({
   updated_at: task.updatedAt,
 });
 
-export type SerialisedTask = ReturnType<typeof serialise>;
+export type ApiTask = ReturnType<typeof toApiTask>;
 
 export async function createTask(
   userId: string,
   input: CreateTaskInput,
-): Promise<SerialisedTask> {
+): Promise<ApiTask> {
   const task = await prisma.task.create({
     data: {
       title: input.title,
@@ -42,14 +42,14 @@ export async function createTask(
       createdById: userId,
     },
   });
-  return serialise(task);
+  return toApiTask(task);
 }
 
 export async function listTasks(
   userId: string,
   query: ListTasksQuery,
 ): Promise<{
-  data: SerialisedTask[];
+  data: ApiTask[];
   meta: { page: number; pageSize: number; total: number };
 }> {
   const where: Prisma.TaskWhereInput = {
@@ -96,7 +96,7 @@ export async function listTasks(
   ]);
 
   return {
-    data: rows.map(serialise),
+    data: rows.map(toApiTask),
     meta: {
       page: query.page,
       pageSize: query.pageSize,
@@ -105,51 +105,54 @@ export async function listTasks(
   };
 }
 
-// Loads a task that the user owns and that hasn't been soft-deleted.
-// Cross-user access collapses to 404 to prevent ID-existence probing
-// (foreign IDs and unknown IDs look identical to the caller).
-async function loadOwned(id: string, userId: string): Promise<Task> {
+export async function getTask(
+  userId: string,
+  id: string,
+): Promise<ApiTask> {
+  // findFirst with the soft-delete + ownership predicate. Foreign-owned
+  // and unknown ids return identical 404 responses on purpose — no
+  // ID-existence oracle.
   const task = await prisma.task.findFirst({
     where: { id, createdById: userId, ...NOT_DELETED },
   });
   if (!task) throw AppError.notFound('Task not found');
-  return task;
-}
-
-export async function getTask(
-  userId: string,
-  id: string,
-): Promise<SerialisedTask> {
-  return serialise(await loadOwned(id, userId));
+  return toApiTask(task);
 }
 
 export async function updateTask(
   userId: string,
   id: string,
   input: UpdateTaskInput,
-): Promise<SerialisedTask> {
-  // Cheap existence/ownership probe with the soft-delete filter applied.
-  await loadOwned(id, userId);
+): Promise<ApiTask> {
+  const data: Prisma.TaskUncheckedUpdateInput = {
+    ...(input.title !== undefined ? { title: input.title } : {}),
+    ...(input.description !== undefined
+      ? { description: input.description ?? null }
+      : {}),
+    ...(input.status !== undefined ? { status: input.status } : {}),
+    ...(input.due_date !== undefined
+      ? {
+          dueDate: input.due_date ? new Date(input.due_date) : null,
+        }
+      : {}),
+    ...(input.assignee_id !== undefined
+      ? { assigneeId: input.assignee_id ?? null }
+      : {}),
+  };
 
-  const task = await prisma.task.update({
-    where: { id },
-    data: {
-      ...(input.title !== undefined ? { title: input.title } : {}),
-      ...(input.description !== undefined
-        ? { description: input.description ?? null }
-        : {}),
-      ...(input.status !== undefined ? { status: input.status } : {}),
-      ...(input.due_date !== undefined
-        ? {
-            dueDate: input.due_date ? new Date(input.due_date) : null,
-          }
-        : {}),
-      ...(input.assignee_id !== undefined
-        ? { assigneeId: input.assignee_id ?? null }
-        : {}),
-    },
+  // Atomic: a single UPDATE WHERE id = ? AND created_by = ? AND
+  // deleted_at IS NULL. Mirrors deleteTask so a concurrent DELETE between
+  // two queries can't make a PATCH succeed against a soft-deleted row.
+  const { count } = await prisma.task.updateMany({
+    where: { id, createdById: userId, ...NOT_DELETED },
+    data,
   });
-  return serialise(task);
+  if (count === 0) throw AppError.notFound('Task not found');
+
+  // Re-fetch to return the up-to-date row. Safe: the predicate above
+  // proved the row is owned + active; updateMany has just committed.
+  const task = await prisma.task.findUniqueOrThrow({ where: { id } });
+  return toApiTask(task);
 }
 
 export async function deleteTask(
@@ -159,11 +162,11 @@ export async function deleteTask(
   // Atomic soft-delete: only set deleted_at if the task is currently owned
   // by the user AND not already deleted. Prevents a TOCTOU between a
   // findFirst-then-update and a concurrent delete.
-  const result = await prisma.task.updateMany({
+  const { count } = await prisma.task.updateMany({
     where: { id, createdById: userId, ...NOT_DELETED },
     data: { deletedAt: new Date() },
   });
-  if (result.count === 0) {
+  if (count === 0) {
     throw AppError.notFound('Task not found');
   }
 }

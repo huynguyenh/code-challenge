@@ -10,6 +10,12 @@ const isoDate = z
   .min(1)
   .refine((s) => !Number.isNaN(Date.parse(s)), 'Invalid date');
 
+// Path-param schema for /tasks/:id. Validating up-front prevents Prisma's
+// own UUID rejection (P2023) from leaking through as a 500 INTERNAL_ERROR.
+export const taskIdParamSchema = z.object({
+  id: z.string().uuid('id must be a valid UUID'),
+});
+
 export const createTaskSchema = z.object({
   title: z.string().trim().min(1).max(200),
   description: z.string().trim().max(5_000).nullable().optional(),
@@ -22,7 +28,9 @@ export const updateTaskSchema = createTaskSchema.partial();
 
 export const listTasksQuerySchema = z.object({
   status: taskStatus.optional(),
-  q: z.string().trim().min(1).optional(),
+  // Cap at 200 chars: combined with the O(n) ILIKE this is a cheap
+  // amplification surface if left unbounded.
+  q: z.string().trim().min(1).max(200).optional(),
   dueBefore: isoDate.optional(),
   dueAfter: isoDate.optional(),
   assigneeId: z.string().uuid().optional(),
@@ -30,6 +38,7 @@ export const listTasksQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 
+export type TaskIdParam = z.infer<typeof taskIdParamSchema>;
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
 export type ListTasksQuery = z.infer<typeof listTasksQuerySchema>;

@@ -1,13 +1,10 @@
-import {
-  Router,
-  type NextFunction,
-  type Request,
-  type Response,
-} from 'express';
+import { Router } from 'express';
+import { asyncHandler } from '../../lib/asyncHandler.js';
 import { requireAuth } from '../../middleware/auth.js';
 import {
   createTaskSchema,
   listTasksQuerySchema,
+  taskIdParamSchema,
   updateTaskSchema,
 } from './schema.js';
 import {
@@ -25,67 +22,46 @@ tasksRouter.use(requireAuth);
 
 tasksRouter.post(
   '/',
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const input = createTaskSchema.parse(req.body);
-      const task = await createTask(req.user!.id, input);
-      res.status(201).json(task);
-    } catch (err) {
-      next(err);
-    }
-  },
+  asyncHandler(async (req, res) => {
+    const input = createTaskSchema.parse(req.body);
+    const task = await createTask(req.user!.id, input);
+    res.status(201).json(task);
+  }),
 );
 
 tasksRouter.get(
   '/',
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const query = listTasksQuerySchema.parse(req.query);
-      const result = await listTasks(req.user!.id, query);
-      res.json(result);
-    } catch (err) {
-      next(err);
-    }
-  },
+  asyncHandler(async (req, res) => {
+    const query = listTasksQuerySchema.parse(req.query);
+    const result = await listTasks(req.user!.id, query);
+    res.json(result);
+  }),
 );
 
 tasksRouter.get(
   '/:id',
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const task = await getTask(req.user!.id, req.params['id']!);
-      res.json(task);
-    } catch (err) {
-      next(err);
-    }
-  },
+  asyncHandler(async (req, res) => {
+    const { id } = taskIdParamSchema.parse(req.params);
+    const task = await getTask(req.user!.id, id);
+    res.json(task);
+  }),
 );
 
 tasksRouter.patch(
   '/:id',
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const input = updateTaskSchema.parse(req.body);
-      const task = await updateTask(
-        req.user!.id,
-        req.params['id']!,
-        input,
-      );
-      res.json(task);
-    } catch (err) {
-      next(err);
-    }
-  },
+  asyncHandler(async (req, res) => {
+    const { id } = taskIdParamSchema.parse(req.params);
+    const input = updateTaskSchema.parse(req.body);
+    const task = await updateTask(req.user!.id, id, input);
+    res.json(task);
+  }),
 );
 
 tasksRouter.delete(
   '/:id',
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      await deleteTask(req.user!.id, req.params['id']!);
-      res.status(204).send();
-    } catch (err) {
-      next(err);
-    }
-  },
+  asyncHandler(async (req, res) => {
+    const { id } = taskIdParamSchema.parse(req.params);
+    await deleteTask(req.user!.id, id);
+    res.status(204).send();
+  }),
 );
