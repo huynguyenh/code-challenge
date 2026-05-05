@@ -6,7 +6,7 @@ This repo contains my answers to the **backend** track of the [99Tech Code Chall
 |---|---|---|---|
 | 4 | Three ways to sum to n | ✅ done | [`src/problem4`](./src/problem4) |
 | 5 | A Crude Server | ✅ done | [`src/problem5`](./src/problem5) |
-| 6 | Architecture | _deferred_ | [`src/problem6`](./src/problem6) |
+| 6 | Architecture | ✅ done | [`src/problem6`](./src/problem6) |
 
 > Each problem is implemented on its own feature branch and merged via a squashed PR — see the [Pull Requests tab](../../pulls?q=is%3Apr) for the per-problem story.
 
@@ -23,7 +23,8 @@ All artefacts that demonstrate **how** I built this live in [`docs/`](./docs):
 - **Language:** TypeScript (Node 20)
 - **Test runner:** Vitest
 - **Problem 4:** pure TS, no runtime deps
-- **Problem 5:** Express + Sequelize + Postgres (Docker), JWT auth, Zod validation
+- **Problem 5:** Express + Prisma + Postgres (Docker), JWT auth, Zod validation
+- **Problem 6:** specification only — Markdown + embedded Mermaid diagrams (no code)
 
 ## Local prerequisites
 
