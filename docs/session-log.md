@@ -191,3 +191,50 @@ Plus a new test that asserts `GET /tasks/not-a-uuid` returns 400, regression-gua
 Next: push the fix commit, run the security agent, then merge.
 
 ---
+
+## Problem 6 — Architecture spec
+
+> **User:** ok now for problem 6, walk me through that first
+
+**Claude:** Did the walk-through before any writing — restated the brief, identified that "prevent malicious users from increasing scores without authorisation" is the entire load-bearing problem, sketched three credible anti-cheat approaches (trust-the-client / server-mediated / signed-proof-token) with explicit trade-offs, picked SSE over WebSockets/polling for live updates with reasoning, proposed a 14-section RFC structure, and explained why I'd use Mermaid embedded in the README rather than separate diagram files.
+
+Then I asked four `AskUserQuestion`s on the only forks where the spec could go either way:
+
+- **Anti-cheat strength** → server-mediated + signed proof + Redis nonce (Approach C, the production-grade option)
+- **Live transport** → SSE primary, polling fallback
+- **Diagrams** → Mermaid embedded in the README
+- **Spec depth** → ~800–1200 lines, full RFC-style with API tables, sequence diagrams, security threats matrix, ops, improvements
+
+> **User:** lets go → (interrupted) → are you finish → not yet → go please?
+
+Branched `feat/problem6` from the up-to-date main. Confirmed nothing was committed yet — I'd announced the writing but hadn't started, so the user got an accurate "no, just branched" before I went heads-down.
+
+### What got written
+
+`src/problem6/README.md` — **962 lines, 6 Mermaid diagrams**, single self-contained spec per the brief's "documentation for this module on a README.md file". Sections:
+
+1. **Context** — verbatim brief + the "why this is non-trivial" argument (auth ≠ proof-of-action)
+2. **Goals & non-goals** — 7 + 7 explicit bullets
+3. **High-level architecture** — Mermaid component diagram + responsibility table + happy-path narrative
+4. **Action lifecycle & threat model** — state machine, JWT proof claims (typ/sub/act/nonce/exp/delta), 5-step verification rule, three sequence diagrams (happy / replay / forgery)
+5. **API contract** — full tables for `/actions/start`, `/actions/complete`, `/scoreboard`, `/scoreboard/stream` with Zod schemas, status codes, error codes
+6. **Data model** — full Postgres DDL (users, scores, score_events_pending, score_events) with index rationale; Redis keys (ZSET, nonce SET, pub/sub channel, event Stream); cache-coherency reconciliation
+7. **Live-update mechanism** — why SSE; connection lifecycle (Mermaid sequence); pub/sub fanout (Mermaid flowchart); polling fallback contract
+8. **Security model** — 15-row threat × mitigation table; cryptographic-agility migration path (HS256 → RS256)
+9. **Concurrency & failure modes** — atomicity guarantees; what-if-Redis-down / what-if-Postgres-down / what-if-pubsub-message-lost; idempotency contract per endpoint; clock skew tolerance
+10. **Operational concerns** — 10 metrics with alert thresholds; 6 paged alerts; logging policy; rollback SQL; dashboard sketch
+11. **Implementation notes** — service-split path; recommended stack; sticky sessions (none needed); caching; local dev
+12. **Improvements** — 13 explicit improvement items per the brief's "additional comments for improvement" requirement (server-side action validation, anomaly detection, multi-leaderboard, sharding, idempotency keys, Streams instead of pub/sub, WebSocket upgrade path, client attestation, token rotation, delta capping, analytics stream, retention policy, rate-limit observability)
+13. **Open questions** — 7 items requiring product alignment (action vocabulary, score growth, tie-breaking, privacy, reset cadence, negative deltas, PII boundary)
+14. **Glossary** — terminology
+- **Appendices** — sequence-diagram index, RFC references (JWT 7519, WHATWG SSE, Redis sorted sets, OWASP API Top 10)
+
+### Things I deliberately did NOT do
+
+- No code skeleton — the brief is "documentation only" and Claude shouldn't bloat the deliverable with a half-implementation.
+- No separate diagram files — Mermaid in-README renders on GitHub natively, stays text-versionable, lives next to the prose.
+- No OpenAPI YAML — the API contract is a Markdown table per the brief's "README.md" requirement; an OpenAPI artefact is a future-day-2 item.
+
+Next: commit, push, PR #3.
+
+---
